@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -498,6 +499,117 @@ class StopWatchTest extends AbstractLangTest {
         watch.split();
         final String splitStr = watch.toString();
         assertEquals(SPLIT_CLOCK_STR_LEN + MESSAGE.length() + 1, splitStr.length(), "Formatted split string not the correct length");
+    }
+
+    @Test
+    void testSplitsWithStringLabels() {
+        final StopWatch watch = new StopWatch();
+        final String firstLabel = "one";
+        final String secondLabel = "two";
+        final String thirdLabel = "three";
+        final int firstSleepTime = 400;
+        final int secondSleepTime = 300;
+        final int thirdSleepTime = 200;
+        watch.start();
+        ThreadUtils.sleepQuietly(Duration.ofMillis(100));
+
+        watch.split(firstLabel);
+        ThreadUtils.sleepQuietly(Duration.ofMillis(firstSleepTime));
+        watch.split(secondLabel);
+        ThreadUtils.sleepQuietly(Duration.ofMillis(secondSleepTime));
+        watch.split(thirdLabel);
+        ThreadUtils.sleepQuietly(Duration.ofMillis(thirdSleepTime));
+
+        final List<StopWatch.Split> splits = watch.getProcessedSplits();
+
+        // check sizes
+        assertEquals(3, splits.size());
+
+        // check labels
+        assertEquals(splits.get(0).getLabel(), firstLabel);
+        assertEquals(splits.get(1).getLabel(), secondLabel);
+        assertEquals(splits.get(2).getLabel(), thirdLabel);
+
+        // check duration
+        final int margin = 200;
+        assertEquals(firstSleepTime, splits.get(0).getDuration(), margin);
+        assertEquals(secondSleepTime, splits.get(1).getDuration(), margin);
+        assertEquals(thirdSleepTime, splits.get(2).getDuration(), margin);
+
+        // check report
+        final String report = watch.getReport();
+        assertTrue(report.contains("one 00:00:00."));
+        assertTrue(report.contains("two 00:00:00."));
+        assertTrue(report.contains("three 00:00:00."));
+    }
+
+    @Test
+    void testSplitsWithIntLabels() {
+        final StopWatch watch = new StopWatch();
+        final int firstLabel = 1;
+        final int secondLabel = 2;
+        final int thirdLabel = 3;
+        final int firstSleepTime = 400;
+        final int secondSleepTime = 300;
+        final int thirdSleepTime = 200;
+        watch.start();
+        ThreadUtils.sleepQuietly(Duration.ofMillis(100));
+
+        watch.split(firstLabel);
+        ThreadUtils.sleepQuietly(Duration.ofMillis(firstSleepTime));
+        watch.split(secondLabel);
+        ThreadUtils.sleepQuietly(Duration.ofMillis(secondSleepTime));
+        watch.split(thirdLabel);
+        ThreadUtils.sleepQuietly(Duration.ofMillis(thirdSleepTime));
+
+        final List<StopWatch.Split> splits = watch.getProcessedSplits();
+
+        // check sizes
+        assertEquals(3, splits.size());
+
+        // check labels
+        assertEquals(splits.get(0).getLabel(), String.valueOf(firstLabel));
+        assertEquals(splits.get(1).getLabel(), String.valueOf(secondLabel));
+        assertEquals(splits.get(2).getLabel(), String.valueOf(thirdLabel));
+
+        // check duration
+        final int margin = 200;
+        assertEquals(firstSleepTime, splits.get(0).getDuration(), margin);
+        assertEquals(secondSleepTime, splits.get(1).getDuration(), margin);
+        assertEquals(thirdSleepTime, splits.get(2).getDuration(), margin);
+
+        // check report
+        final String report = watch.getReport();
+        assertTrue(report.contains("1 00:00:00."));
+        assertTrue(report.contains("2 00:00:00."));
+        assertTrue(report.contains("3 00:00:00."));
+    }
+
+    @Test
+    void testNanoSplitsWithLabel() {
+        final StopWatch watch = StopWatch.createStarted();
+        ThreadUtils.sleepQuietly(Duration.ofMillis(100));
+
+        watch.split("coding");
+        ThreadUtils.sleepQuietly(Duration.ofMillis(200));
+
+        watch.split("eating");
+        ThreadUtils.sleepQuietly(Duration.ofMillis(300));
+
+        final List<StopWatch.Split> splits = watch.getNanoProcessedSplits();
+
+        // check sizes
+        assertEquals(2, splits.size());
+
+        // check duration
+        final int margin = 200_000_000;
+        assertEquals(200_000_000, splits.get(0).getDuration(), margin);
+        assertEquals(300_000_000, splits.get(1).getDuration(), margin);
+
+        // check report
+        final String report = watch.getNanoReport();
+        assertTrue(report.contains("coding "));
+        assertTrue(report.contains("eating "));
     }
 
     private int throwIOException() throws IOException {
