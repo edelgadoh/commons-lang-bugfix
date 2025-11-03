@@ -16,19 +16,25 @@
  */
 package org.apache.commons.lang3.time;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.text.DateFormatSymbols;
 import java.text.ParseException;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -38,9 +44,11 @@ import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.DefaultLocale;
 import org.junitpioneer.jupiter.DefaultTimeZone;
 import org.junitpioneer.jupiter.ReadsDefaultLocale;
@@ -69,8 +77,47 @@ class FastDateParser_TimeZoneStrategyTest extends AbstractLangTest {
         }
     }
 
+    static Set<Entry<String, String>> getZoneIdStream() {
+        return ZoneId.SHORT_IDS.entrySet();
+    }
+
     private String[][] getZoneStringsSorted(final Locale locale) {
         return ArraySorter.sort(DateFormatSymbols.getInstance(locale).getZoneStrings(), Comparator.comparing(array -> array[0]));
+    }
+
+    /**
+     * Tests that known short {@link ZoneId}s still parse since all short IDs are deprecated starting in Java 25, but are not removed.
+     *
+     * TODO: Why don't all short IDs parse, even on Java 8?
+     *
+     * @throws ParseException Thrown on test failure.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = { "ACT", "CST" })
+    void testJava25DeprecatedZoneId(final String shortId) throws ParseException {
+        final FastDateParser parser = new FastDateParser("dd.MM.yyyy HH:mm:ss z", TimeZone.getTimeZone(shortId), Locale.getDefault());
+        final Date date1 = parser.parse("26.10.2014 02:00:00 " + shortId);
+        // 1) parsing returns a value and doesn't throw.
+        assertNotNull(date1);
+        // 2) Something reasonable, note that getYear() subtracts 1900.
+        assertEquals(2014, date1.getYear() + 1900);
+    }
+
+    /**
+     * Tests that {@link ZoneId#SHORT_IDS} keys and values still works as they are deprecated starting in Java 25, but not removed yet.
+     *
+     * TODO: Why don't all short IDs parse, even on Java 8?
+     *
+     * @throws ParseException Thrown on test failure.
+     */
+    @Disabled
+    @ParameterizedTest
+    @MethodSource("getZoneIdStream")
+    void testJava25DeprecatedZoneIds(final Map.Entry<String, String> entry) throws ParseException {
+        final FastDateParser parser = new FastDateParser("dd.MM.yyyy HH:mm:ss z", TimeZone.getDefault(), Locale.GERMAN);
+        final Date date1 = parser.parse("26.10.2014 02:00:00 " + entry.getKey());
+        final Date date2 = parser.parse("26.10.2014 02:00:00 " + entry.getValue());
+        assertNotEquals(date1.getTime(), date2.getTime());
     }
 
     @Test
@@ -86,7 +133,6 @@ class FastDateParser_TimeZoneStrategyTest extends AbstractLangTest {
     void testTimeZoneStrategy_DateFormatSymbols(final Locale locale) {
         testTimeZoneStrategyPattern_DateFormatSymbols_getZoneStrings(locale);
     }
-
     @ParameterizedTest
     @MethodSource("org.apache.commons.lang3.LocaleUtils#availableLocaleList()")
     void testTimeZoneStrategy_TimeZone(final Locale locale) {
